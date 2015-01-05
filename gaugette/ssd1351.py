@@ -299,7 +299,7 @@ class SSD1351:
                 for x in range(0, self.cols):
                     mem_col = x
                     offset = mem_row + self.rows * mem_col
-                    if self.data[offset] > 0
+                    if self.data[offset] > 0:
                         line += '*'
                     else:
                         line += ' '
