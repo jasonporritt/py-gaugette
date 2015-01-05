@@ -283,7 +283,7 @@ class SSD1351:
         def __init__(self, cols, rows):
             self.rows = rows
             self.cols = cols
-            self.bytes_per_col = rows * (BITS_PER_PIXEL / 8) 
+            self.bytes_per_col = rows * (self.BITS_PER_PIXEL / 8) 
             self.data = [0] * (self.cols * self.bytes_per_col)
 
         def clear(self):
@@ -361,7 +361,7 @@ class SSD1351:
                     prev_char = pos
                     prev_width = width
                     
-                    bytes_per_row = (width + 7) * (BITS_PER_PIXEL / 8)
+                    bytes_per_row = (width + 7) * (self.BITS_PER_PIXEL / 8)
                     for row in range(0,height):
                         py = y + row
                         mask = 0x80
