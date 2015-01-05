@@ -95,7 +95,7 @@ class SSD1351:
         self.cols = cols
         self.rows = rows
         self.buffer_rows = buffer_rows
-        self.mem_bytes = (self.buffer_rows * self.cols * 18) / 16 # total bytes in SSD1351 display ram
+        self.mem_bytes = (self.buffer_rows * self.cols) # total bytes in SSD1351 display ram
         self.dc_pin = dc_pin
         self.reset_pin = reset_pin
         self.spi = gaugette.spi.SPI(bus, device)
@@ -137,7 +137,7 @@ class SSD1351:
         time.sleep(0.001) # 1ms
         self.reset()
         self.command(self.CMD_COMMANDLOCK, 0x12)
-        self.command(self.CMD_COMMANDLOCK, 0xB1)
+        self.command(self.CMD_COMMANDLOCK, 0x80)
         self.command(self.CMD_DISPLAYOFF)
         self.command(self.CMD_CLOCKDIV, 0xF1)
 
@@ -208,8 +208,8 @@ class SSD1351:
     # col_offset: column offset in buffer to write from
     #  
     def display_block(self, bitmap, row, col, col_count, col_offset=0):
-        page_count = bitmap.rows >> 3
-        page_start = row >> 3
+        page_count = bitmap.rows
+        page_start = row
         page_end   = page_start + page_count - 1
         col_start  = col
         col_end    = col + col_count - 1
