@@ -272,6 +272,9 @@ class SSD1351:
         return self.bitmap.text_width(string, font)
 
     class Bitmap:
+
+        # TODO: Only functioning value is 16
+        BITS_PER_PIXEL = 16
     
         # Pixels are stored in column-major order!
         # This makes it easy to reference a vertical slice of the display buffer
@@ -280,23 +283,23 @@ class SSD1351:
         def __init__(self, cols, rows):
             self.rows = rows
             self.cols = cols
-            self.bytes_per_col = rows / 8
+            self.bytes_per_col = rows * (BITS_PER_PIXEL / 8) 
             self.data = [0] * (self.cols * self.bytes_per_col)
-    
+
         def clear(self):
             for i in range(0,len(self.data)):
                 self.data[i] = 0
 
         # Diagnostic print of the memory buffer to stdout 
+        # TODO: Only works for BITS_PER_PIXEL value of 16
         def dump(self):
             for y in range(0, self.rows):
-                mem_row = y/8
-                bit_mask = 1 << (y % 8)
+                mem_row = y * self.bytes_per_col
                 line = ""
                 for x in range(0, self.cols):
                     mem_col = x
-                    offset = mem_row + self.rows/8 * mem_col
-                    if self.data[offset] & bit_mask:
+                    offset = mem_row + self.rows * mem_col
+                    if self.data[offset] > 0
                         line += '*'
                     else:
                         line += ' '
@@ -307,13 +310,12 @@ class SSD1351:
                 return
             mem_col = x
             mem_row = y / 8
-            bit_mask = 1 << (y % 8)
-            offset = mem_row + self.rows/8 * mem_col
+            offset = mem_row + self.rows * mem_col
     
             if on:
-                self.data[offset] |= bit_mask
+                self.data[offset] = 0xF
             else:
-                self.data[offset] &= (0xFF - bit_mask)
+                self.data[offset] = 0
     
         def clear_block(self, x0,y0,dx,dy):
             for x in range(x0,x0+dx):
@@ -359,7 +361,7 @@ class SSD1351:
                     prev_char = pos
                     prev_width = width
                     
-                    bytes_per_row = (width + 7) / 8
+                    bytes_per_row = (width + 7) * (BITS_PER_PIXEL / 8)
                     for row in range(0,height):
                         py = y + row
                         mask = 0x80
@@ -379,94 +381,94 @@ class SSD1351:
     
             return x
 
-    # This is a helper class to display a scrollable list of text lines.
-    # The list must have at least 1 item.
-    class ScrollingList:
-        def __init__(self, display, list, font):
-            self.display = display
-            self.list = list
-            self.font = font
-            self.position = 0 # row index into list, 0 to len(list) * self.rows - 1
-            self.offset = 0   # led hardware scroll offset
-            self.pan_row = -1
-            self.pan_offset = 0
-            self.pan_direction = 1
-            self.bitmaps = []
-            self.rows = display.rows
-            self.cols = display.cols
-            self.bufrows = self.rows * 2
-            downset = (self.rows - font.char_height)/2
-            for text in list:
-                width = display.cols
-                text_bitmap = display.Bitmap(width, self.rows)
-                width = text_bitmap.draw_text(0,downset,text,font)
-                if width > 128:
-                    text_bitmap = display.Bitmap(width+15, self.rows)
-                    text_bitmap.draw_text(0,downset,text,font)
-                self.bitmaps.append(text_bitmap)
-                
-            # display the first word in the first position
-            self.display.display_block(self.bitmaps[0], 0, 0, self.cols)
-    
-        # how many steps to the nearest home position
-        def align_offset(self):
-            pos = self.position % self.rows
-            midway = (self.rows/2)
-            delta = (pos + midway) % self.rows - midway
-            return -delta
+    ## This is a helper class to display a scrollable list of text lines.
+    ## The list must have at least 1 item.
+    #class ScrollingList:
+    #    def __init__(self, display, list, font):
+    #        self.display = display
+    #        self.list = list
+    #        self.font = font
+    #        self.position = 0 # row index into list, 0 to len(list) * self.rows - 1
+    #        self.offset = 0   # led hardware scroll offset
+    #        self.pan_row = -1
+    #        self.pan_offset = 0
+    #        self.pan_direction = 1
+    #        self.bitmaps = []
+    #        self.rows = display.rows
+    #        self.cols = display.cols
+    #        self.bufrows = self.rows * 2
+    #        downset = (self.rows - font.char_height)/2
+    #        for text in list:
+    #            width = display.cols
+    #            text_bitmap = display.Bitmap(width, self.rows)
+    #            width = text_bitmap.draw_text(0,downset,text,font)
+    #            if width > 128:
+    #                text_bitmap = display.Bitmap(width+15, self.rows)
+    #                text_bitmap.draw_text(0,downset,text,font)
+    #            self.bitmaps.append(text_bitmap)
+    #            
+    #        # display the first word in the first position
+    #        self.display.display_block(self.bitmaps[0], 0, 0, self.cols)
+    #
+    #    # how many steps to the nearest home position
+    #    def align_offset(self):
+    #        pos = self.position % self.rows
+    #        midway = (self.rows/2)
+    #        delta = (pos + midway) % self.rows - midway
+    #        return -delta
 
-        def align(self, delay=0.005):
-            delta = self.align_offset()
-            if delta!=0:
-                steps = abs(delta)
-                sign = delta/steps
-                for i in range(0,steps):
-                    if i>0 and delay>0:
-                        time.sleep(delay)
-                    self.scroll(sign)
-            return self.position / self.rows
-    
-        # scroll up or down.  Does multiple one-pixel scrolls if delta is not >1 or <-1
-        def scroll(self, delta):
-            if delta == 0:
-                return
-    
-            count = len(self.list)
-            step = cmp(delta, 0)
-            for i in range(0,delta, step):
-                if (self.position % self.rows) == 0:
-                    n = self.position / self.rows
-                    # at even boundary, need to update hidden row
-                    m = (n + step + count) % count
-                    row = (self.offset + self.rows) % self.bufrows
-                    self.display.display_block(self.bitmaps[m], row, 0, self.cols)
-                    if m == self.pan_row:
-                        self.pan_offset = 0
-                self.offset = (self.offset + self.bufrows + step) % self.bufrows
-                self.display.command(self.display.SET_START_LINE | self.offset)
-                max_position = count * self.rows
-                self.position = (self.position + max_position + step) % max_position
-    
-        # pans the current row back and forth repeatedly.
-        # Note that this currently only works if we are at a home position.
-        def auto_pan(self):
-            n = self.position / self.rows
-            if n != self.pan_row:
-                self.pan_row = n
-                self.pan_offset = 0
-                
-            text_bitmap = self.bitmaps[n]
-            if text_bitmap.cols > self.cols:
-                row = self.offset # this only works if we are at a home position
-                if self.pan_direction > 0:
-                    if self.pan_offset <= (text_bitmap.cols - self.cols):
-                        self.pan_offset += 1
-                    else:
-                        self.pan_direction = -1
-                else:
-                    if self.pan_offset > 0:
-                        self.pan_offset -= 1
-                    else:
-                        self.pan_direction = 1
-                self.display.display_block(text_bitmap, row, 0, self.cols, self.pan_offset)
-    
+    #    def align(self, delay=0.005):
+    #        delta = self.align_offset()
+    #        if delta!=0:
+    #            steps = abs(delta)
+    #            sign = delta/steps
+    #            for i in range(0,steps):
+    #                if i>0 and delay>0:
+    #                    time.sleep(delay)
+    #                self.scroll(sign)
+    #        return self.position / self.rows
+    #
+    #    # scroll up or down.  Does multiple one-pixel scrolls if delta is not >1 or <-1
+    #    def scroll(self, delta):
+    #        if delta == 0:
+    #            return
+    #
+    #        count = len(self.list)
+    #        step = cmp(delta, 0)
+    #        for i in range(0,delta, step):
+    #            if (self.position % self.rows) == 0:
+    #                n = self.position / self.rows
+    #                # at even boundary, need to update hidden row
+    #                m = (n + step + count) % count
+    #                row = (self.offset + self.rows) % self.bufrows
+    #                self.display.display_block(self.bitmaps[m], row, 0, self.cols)
+    #                if m == self.pan_row:
+    #                    self.pan_offset = 0
+    #            self.offset = (self.offset + self.bufrows + step) % self.bufrows
+    #            self.display.command(self.display.SET_START_LINE | self.offset)
+    #            max_position = count * self.rows
+    #            self.position = (self.position + max_position + step) % max_position
+    #
+    #    # pans the current row back and forth repeatedly.
+    #    # Note that this currently only works if we are at a home position.
+    #    def auto_pan(self):
+    #        n = self.position / self.rows
+    #        if n != self.pan_row:
+    #            self.pan_row = n
+    #            self.pan_offset = 0
+    #            
+    #        text_bitmap = self.bitmaps[n]
+    #        if text_bitmap.cols > self.cols:
+    #            row = self.offset # this only works if we are at a home position
+    #            if self.pan_direction > 0:
+    #                if self.pan_offset <= (text_bitmap.cols - self.cols):
+    #                    self.pan_offset += 1
+    #                else:
+    #                    self.pan_direction = -1
+    #            else:
+    #                if self.pan_offset > 0:
+    #                    self.pan_offset -= 1
+    #                else:
+    #                    self.pan_direction = 1
+    #            self.display.display_block(text_bitmap, row, 0, self.cols, self.pan_offset)
+    #
