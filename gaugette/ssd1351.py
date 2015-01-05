@@ -283,8 +283,7 @@ class SSD1351:
         def __init__(self, cols, rows):
             self.rows = rows
             self.cols = cols
-            self.bytes_per_col = rows * (self.BITS_PER_PIXEL / 8) 
-            self.data = [0] * (self.cols * self.bytes_per_col)
+            self.data = [0] * (self.cols * self.rows)
 
         def clear(self):
             for i in range(0,len(self.data)):
@@ -294,7 +293,7 @@ class SSD1351:
         # TODO: Only works for BITS_PER_PIXEL value of 16
         def dump(self):
             for y in range(0, self.rows):
-                mem_row = y * self.bytes_per_col
+                mem_row = y * self.rows
                 line = ""
                 for x in range(0, self.cols):
                     mem_col = x
