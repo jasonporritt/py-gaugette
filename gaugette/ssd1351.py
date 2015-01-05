@@ -309,7 +309,7 @@ class SSD1351:
             if (x<0 or x>=self.cols or y<0 or y>=self.rows):
                 return
             mem_col = x
-            mem_row = y / 8
+            mem_row = y
             offset = mem_row + self.rows * mem_col
     
             if on:
